@@ -9,20 +9,12 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy manifests
+# Copy manifests and source
 COPY Cargo.toml Cargo.lock* ./
-
-# Create dummy main.rs for dependency caching
-RUN mkdir -p src && echo "fn main() {}" > src/main.rs
-
-# Build dependencies only
-RUN cargo build --release && rm -rf src
-
-# Copy source code
 COPY src ./src
 
 # Build the application
-RUN touch src/main.rs && cargo build --release
+RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -33,6 +25,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy binary from builder
