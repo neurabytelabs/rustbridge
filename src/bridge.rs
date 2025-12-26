@@ -57,8 +57,8 @@ impl Bridge {
 
         let app = api::create_router(api_state);
 
-        let addr: SocketAddr = format!("{}:{}", self.config.server.host, self.config.server.port)
-            .parse()?;
+        let addr: SocketAddr =
+            format!("{}:{}", self.config.server.host, self.config.server.port).parse()?;
 
         info!("Starting API server on http://{}", addr);
         info!("  - Health check: http://{}/health", addr);

@@ -13,6 +13,7 @@ pub mod client;
 pub mod reader;
 
 /// Modbus client abstraction
+#[allow(dead_code)]
 pub struct ModbusClient {
     device_id: String,
     context: Option<client::Context>,
@@ -52,35 +53,46 @@ impl ModbusClient {
 
     /// Read registers from the device
     pub async fn read_registers(&mut self, register: &RegisterConfig) -> Result<Vec<u16>> {
-        let ctx = self.context.as_mut()
+        let ctx = self
+            .context
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("No connection available"))?;
 
         let values = match register.register_type {
             RegisterType::Holding => {
-                debug!("Reading {} holding registers from address {}",
-                       register.count, register.address);
+                debug!(
+                    "Reading {} holding registers from address {}",
+                    register.count, register.address
+                );
                 ctx.read_holding_registers(register.address, register.count)
                     .await
                     .map_err(|e| anyhow::anyhow!("Modbus error: {}", e))?
             }
             RegisterType::Input => {
-                debug!("Reading {} input registers from address {}",
-                       register.count, register.address);
+                debug!(
+                    "Reading {} input registers from address {}",
+                    register.count, register.address
+                );
                 ctx.read_input_registers(register.address, register.count)
                     .await
                     .map_err(|e| anyhow::anyhow!("Modbus error: {}", e))?
             }
             RegisterType::Coil => {
-                let coils = ctx.read_coils(register.address, register.count)
+                let coils = ctx
+                    .read_coils(register.address, register.count)
                     .await
                     .map_err(|e| anyhow::anyhow!("Modbus error: {}", e))?;
                 coils.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
             }
             RegisterType::Discrete => {
-                let inputs = ctx.read_discrete_inputs(register.address, register.count)
+                let inputs = ctx
+                    .read_discrete_inputs(register.address, register.count)
                     .await
                     .map_err(|e| anyhow::anyhow!("Modbus error: {}", e))?;
-                inputs.iter().map(|&b| if b { 1u16 } else { 0u16 }).collect()
+                inputs
+                    .iter()
+                    .map(|&b| if b { 1u16 } else { 0u16 })
+                    .collect()
             }
         };
 
@@ -88,21 +100,27 @@ impl ModbusClient {
     }
 
     /// Write a single register
+    #[allow(dead_code)]
     pub async fn write_register(&mut self, address: u16, value: u16) -> Result<()> {
-        let ctx = self.context.as_mut()
+        let ctx = self
+            .context
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("No connection available"))?;
 
         ctx.write_single_register(address, value)
             .await
             .map_err(|e| anyhow::anyhow!("Modbus write error: {}", e))?;
 
-        info!("Wrote value {} to register {} on device {}",
-              value, address, self.device_id);
+        info!(
+            "Wrote value {} to register {} on device {}",
+            value, address, self.device_id
+        );
 
         Ok(())
     }
 
     /// Check if connection is alive
+    #[allow(dead_code)]
     pub fn is_connected(&self) -> bool {
         self.context.is_some()
     }

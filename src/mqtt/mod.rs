@@ -9,6 +9,7 @@ use crate::config::MqttConfig;
 use crate::modbus::reader::RegisterValue;
 
 /// MQTT Publisher for sending register values
+#[allow(dead_code)]
 pub struct MqttPublisher {
     client: AsyncClient,
     topic_prefix: String,
@@ -18,11 +19,7 @@ pub struct MqttPublisher {
 impl MqttPublisher {
     /// Create a new MQTT publisher
     pub async fn new(config: &MqttConfig) -> Result<Self> {
-        let mut mqttoptions = MqttOptions::new(
-            &config.client_id,
-            &config.host,
-            config.port,
-        );
+        let mut mqttoptions = MqttOptions::new(&config.client_id, &config.host, config.port);
 
         mqttoptions.set_keep_alive(Duration::from_secs(30));
 
@@ -69,6 +66,7 @@ impl MqttPublisher {
     }
 
     /// Publish a register value
+    #[allow(dead_code)]
     pub async fn publish(&self, device_id: &str, value: &RegisterValue) -> Result<()> {
         let topic = format!("{}/{}/{}", self.topic_prefix, device_id, value.name);
 
@@ -79,8 +77,8 @@ impl MqttPublisher {
             "timestamp": value.timestamp.to_rfc3339(),
         });
 
-        let payload_str = serde_json::to_string(&payload)
-            .with_context(|| "Failed to serialize payload")?;
+        let payload_str =
+            serde_json::to_string(&payload).with_context(|| "Failed to serialize payload")?;
 
         self.client
             .publish(&topic, self.qos, false, payload_str.as_bytes())
@@ -93,6 +91,7 @@ impl MqttPublisher {
     }
 
     /// Publish device status
+    #[allow(dead_code)]
     pub async fn publish_status(&self, device_id: &str, online: bool) -> Result<()> {
         let topic = format!("{}/{}/status", self.topic_prefix, device_id);
         let payload = if online { "online" } else { "offline" };

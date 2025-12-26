@@ -1,8 +1,11 @@
 # 🌉 RustBridge
 
+[![CI](https://github.com/mrsarac/rustbridge/actions/workflows/ci.yml/badge.svg)](https://github.com/mrsarac/rustbridge/actions/workflows/ci.yml)
+[![Release](https://github.com/mrsarac/rustbridge/actions/workflows/release.yml/badge.svg)](https://github.com/mrsarac/rustbridge/actions/workflows/release.yml)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://hub.docker.com/r/mrsarac/rustbridge)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io/mrsarac/rustbridge)
+[![codecov](https://codecov.io/gh/mrsarac/rustbridge/branch/main/graph/badge.svg)](https://codecov.io/gh/mrsarac/rustbridge)
 
 **Industrial Protocol Bridge - Modbus TCP/RTU to JSON/MQTT Gateway**
 
@@ -28,10 +31,23 @@ RustBridge is a high-performance, lightweight gateway that bridges industrial Mo
 docker run -d \
   -p 3000:3000 \
   -v ./config.yaml:/app/config.yaml \
-  mrsarac/rustbridge:latest
+  ghcr.io/mrsarac/rustbridge:latest
 ```
 
-### Option 2: From Source
+### Option 2: Download Binary
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/mrsarac/rustbridge/releases):
+
+- **Linux x86_64**: `rustbridge-x86_64-unknown-linux-gnu`
+- **macOS Intel**: `rustbridge-x86_64-apple-darwin`
+- **macOS Apple Silicon**: `rustbridge-aarch64-apple-darwin`
+
+```bash
+chmod +x rustbridge-*
+./rustbridge-x86_64-unknown-linux-gnu
+```
+
+### Option 3: From Source
 
 ```bash
 # Clone the repository

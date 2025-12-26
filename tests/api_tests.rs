@@ -116,10 +116,7 @@ async fn test_list_devices_with_data() {
     assert_eq!(devices.len(), 2);
 
     // Check that both devices are present
-    let device_ids: Vec<&str> = devices
-        .iter()
-        .map(|d| d["id"].as_str().unwrap())
-        .collect();
+    let device_ids: Vec<&str> = devices.iter().map(|d| d["id"].as_str().unwrap()).collect();
     assert!(device_ids.contains(&"plc-001"));
     assert!(device_ids.contains(&"sensor-001"));
 }
@@ -283,10 +280,18 @@ async fn test_health_version_format() {
     // Version should be in semver format (e.g., "0.1.0")
     let version = json["version"].as_str().unwrap();
     let parts: Vec<&str> = version.split('.').collect();
-    assert_eq!(parts.len(), 3, "Version should have 3 parts (major.minor.patch)");
+    assert_eq!(
+        parts.len(),
+        3,
+        "Version should have 3 parts (major.minor.patch)"
+    );
 
     // Each part should be a number
     for part in parts {
-        assert!(part.parse::<u32>().is_ok(), "Version part '{}' should be a number", part);
+        assert!(
+            part.parse::<u32>().is_ok(),
+            "Version part '{}' should be a number",
+            part
+        );
     }
 }

@@ -163,15 +163,15 @@ impl Default for Config {
 
 /// Load configuration from file or use defaults
 pub fn load_config() -> Result<Config> {
-    let config_path = std::env::var("RUSTBRIDGE_CONFIG")
-        .unwrap_or_else(|_| "config.yaml".to_string());
+    let config_path =
+        std::env::var("RUSTBRIDGE_CONFIG").unwrap_or_else(|_| "config.yaml".to_string());
 
     if Path::new(&config_path).exists() {
         let content = std::fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read config file: {}", config_path))?;
 
-        let config: Config = serde_yaml::from_str(&content)
-            .with_context(|| "Failed to parse config file")?;
+        let config: Config =
+            serde_yaml::from_str(&content).with_context(|| "Failed to parse config file")?;
 
         Ok(config)
     } else {
@@ -180,7 +180,8 @@ pub fn load_config() -> Result<Config> {
     }
 }
 
-/// Load configuration from a YAML string
+/// Load configuration from a YAML string (used in tests)
+#[cfg(test)]
 pub fn load_config_from_str(yaml: &str) -> Result<Config> {
     serde_yaml::from_str(yaml).with_context(|| "Failed to parse config")
 }

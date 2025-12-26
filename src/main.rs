@@ -7,16 +7,16 @@ use anyhow::Result;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 
+mod api;
+mod bridge;
 mod config;
 mod modbus;
 mod mqtt;
-mod api;
-mod bridge;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
-    let _subscriber = FmtSubscriber::builder()
+    FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .with_target(false)
         .with_thread_ids(true)
@@ -30,7 +30,10 @@ async fn main() -> Result<()> {
 
     // Load configuration
     let config = config::load_config()?;
-    info!("Configuration loaded: {} devices configured", config.devices.len());
+    info!(
+        "Configuration loaded: {} devices configured",
+        config.devices.len()
+    );
 
     // Initialize bridge
     let bridge = bridge::Bridge::new(config).await?;
@@ -42,7 +45,8 @@ async fn main() -> Result<()> {
 }
 
 fn print_banner() {
-    println!(r#"
+    println!(
+        r#"
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
     ║   ██████╗ ██╗   ██╗███████╗████████╗██████╗ ██████╗ ██╗██████╗ ║
@@ -57,5 +61,6 @@ fn print_banner() {
     ║   https://github.com/mrsarac/rustbridge                       ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
-    "#);
+    "#
+    );
 }

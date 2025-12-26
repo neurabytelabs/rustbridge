@@ -26,7 +26,10 @@ pub fn create_router(state: ApiState) -> Router {
         .route("/api/devices", get(list_devices))
         .route("/api/devices/:device_id", get(get_device))
         .route("/api/devices/:device_id/registers", get(get_registers))
-        .route("/api/devices/:device_id/registers/:register_name", get(get_register))
+        .route(
+            "/api/devices/:device_id/registers/:register_name",
+            get(get_register),
+        )
         .with_state(Arc::new(state))
 }
 
@@ -57,9 +60,7 @@ struct DeviceSummary {
     last_update: Option<String>,
 }
 
-async fn list_devices(
-    State(state): State<Arc<ApiState>>,
-) -> Json<DeviceListResponse> {
+async fn list_devices(State(state): State<Arc<ApiState>>) -> Json<DeviceListResponse> {
     let store = state.register_store.read().await;
 
     let devices: Vec<DeviceSummary> = store
@@ -104,9 +105,7 @@ async fn get_device(
 ) -> Result<Json<DeviceResponse>, StatusCode> {
     let store = state.register_store.read().await;
 
-    let registers = store
-        .get(&device_id)
-        .ok_or(StatusCode::NOT_FOUND)?;
+    let registers = store.get(&device_id).ok_or(StatusCode::NOT_FOUND)?;
 
     let registers: Vec<RegisterResponse> = registers
         .values()
@@ -131,9 +130,7 @@ async fn get_registers(
 ) -> Result<Json<Vec<RegisterResponse>>, StatusCode> {
     let store = state.register_store.read().await;
 
-    let registers = store
-        .get(&device_id)
-        .ok_or(StatusCode::NOT_FOUND)?;
+    let registers = store.get(&device_id).ok_or(StatusCode::NOT_FOUND)?;
 
     let registers: Vec<RegisterResponse> = registers
         .values()
@@ -155,13 +152,9 @@ async fn get_register(
 ) -> Result<Json<RegisterResponse>, StatusCode> {
     let store = state.register_store.read().await;
 
-    let registers = store
-        .get(&device_id)
-        .ok_or(StatusCode::NOT_FOUND)?;
+    let registers = store.get(&device_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    let register = registers
-        .get(&register_name)
-        .ok_or(StatusCode::NOT_FOUND)?;
+    let register = registers.get(&register_name).ok_or(StatusCode::NOT_FOUND)?;
 
     Ok(Json(RegisterResponse {
         name: register.name.clone(),

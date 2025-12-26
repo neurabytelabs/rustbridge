@@ -22,7 +22,11 @@ pub enum Context {
 }
 
 impl Context {
-    pub async fn read_holding_registers(&mut self, addr: u16, cnt: u16) -> Result<Vec<u16>, ModbusError> {
+    pub async fn read_holding_registers(
+        &mut self,
+        addr: u16,
+        cnt: u16,
+    ) -> Result<Vec<u16>, ModbusError> {
         match self {
             Context::Tcp(ctx) => {
                 let result = ctx.read_holding_registers(addr, cnt).await?;
@@ -31,7 +35,11 @@ impl Context {
         }
     }
 
-    pub async fn read_input_registers(&mut self, addr: u16, cnt: u16) -> Result<Vec<u16>, ModbusError> {
+    pub async fn read_input_registers(
+        &mut self,
+        addr: u16,
+        cnt: u16,
+    ) -> Result<Vec<u16>, ModbusError> {
         match self {
             Context::Tcp(ctx) => {
                 let result = ctx.read_input_registers(addr, cnt).await?;
@@ -49,7 +57,11 @@ impl Context {
         }
     }
 
-    pub async fn read_discrete_inputs(&mut self, addr: u16, cnt: u16) -> Result<Vec<bool>, ModbusError> {
+    pub async fn read_discrete_inputs(
+        &mut self,
+        addr: u16,
+        cnt: u16,
+    ) -> Result<Vec<bool>, ModbusError> {
         match self {
             Context::Tcp(ctx) => {
                 let result = ctx.read_discrete_inputs(addr, cnt).await?;
@@ -58,7 +70,12 @@ impl Context {
         }
     }
 
-    pub async fn write_single_register(&mut self, addr: u16, value: u16) -> Result<(), ModbusError> {
+    #[allow(dead_code)]
+    pub async fn write_single_register(
+        &mut self,
+        addr: u16,
+        value: u16,
+    ) -> Result<(), ModbusError> {
         match self {
             Context::Tcp(ctx) => {
                 let result = ctx.write_single_register(addr, value).await?;
