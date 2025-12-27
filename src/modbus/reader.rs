@@ -1,14 +1,10 @@
 //! Modbus register reader with polling
 
-use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tokio::time::{interval, Duration};
-use tracing::{debug, error, info};
 
-use super::ModbusClient;
-use crate::config::{DataType, DeviceConfig, RegisterConfig};
+use crate::config::{DataType, RegisterConfig};
 
 /// Represents a register value with metadata
 #[derive(Debug, Clone, serde::Serialize)]
@@ -22,59 +18,6 @@ pub struct RegisterValue {
 
 /// Shared state for register values
 pub type RegisterStore = Arc<RwLock<HashMap<String, HashMap<String, RegisterValue>>>>;
-
-/// Start polling for a device
-pub async fn start_polling(config: DeviceConfig, store: RegisterStore) -> Result<()> {
-    let mut client = ModbusClient::new(&config).await?;
-    let device_id = config.id.clone();
-    let poll_interval = Duration::from_millis(config.poll_interval_ms);
-
-    info!(
-        "Starting polling for device {} every {}ms",
-        device_id, config.poll_interval_ms
-    );
-
-    let mut ticker = interval(poll_interval);
-
-    loop {
-        ticker.tick().await;
-
-        for register in &config.registers {
-            match client.read_registers(register).await {
-                Ok(raw_values) => {
-                    let value = convert_value(&raw_values, register);
-
-                    let reg_value = RegisterValue {
-                        name: register.name.clone(),
-                        raw: raw_values,
-                        value,
-                        unit: register.unit.clone(),
-                        timestamp: chrono::Utc::now(),
-                    };
-
-                    // Store the value
-                    {
-                        let mut store = store.write().await;
-                        let device_map =
-                            store.entry(device_id.clone()).or_insert_with(HashMap::new);
-                        device_map.insert(register.name.clone(), reg_value.clone());
-                    }
-
-                    debug!(
-                        "Device {} register {} = {} {:?}",
-                        device_id, register.name, value, register.unit
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to read register {} from {}: {}",
-                        register.name, device_id, e
-                    );
-                }
-            }
-        }
-    }
-}
 
 /// Convert raw register values to typed value
 pub fn convert_value(raw: &[u16], config: &RegisterConfig) -> f64 {

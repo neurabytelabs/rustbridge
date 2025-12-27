@@ -7,9 +7,9 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;
 
-use crate::api::{self, ApiState};
+use crate::api::{self, ApiState, RegisterUpdate, WriteRequest};
 use crate::config::Config;
-use crate::modbus::reader::{self, RegisterStore};
+use crate::modbus::reader::{self, RegisterStore, RegisterValue};
 use crate::mqtt::MqttPublisher;
 
 /// Main bridge that orchestrates all components
@@ -31,6 +31,15 @@ impl Bridge {
 
     /// Run the bridge
     pub async fn run(self) -> Result<()> {
+        // Create write request channel
+        let (write_tx, mut write_rx) = tokio::sync::mpsc::channel::<WriteRequest>(100);
+
+        // Create API state with broadcast channel
+        let api_state = ApiState::new(self.register_store.clone(), write_tx);
+
+        // Clone for the polling tasks to broadcast updates
+        let update_broadcaster = api_state.update_tx.clone();
+
         // Start MQTT publisher if configured
         let _mqtt_publisher = if !self.config.mqtt.host.is_empty() {
             Some(MqttPublisher::new(&self.config.mqtt).await?)
@@ -38,23 +47,35 @@ impl Bridge {
             None
         };
 
-        // Start polling for each device
+        // Start polling for each device with WebSocket broadcast
         for device in &self.config.devices {
             let store = self.register_store.clone();
             let device_config = device.clone();
+            let broadcaster = update_broadcaster.clone();
 
             tokio::spawn(async move {
-                if let Err(e) = reader::start_polling(device_config, store).await {
+                if let Err(e) =
+                    start_polling_with_broadcast(device_config, store, broadcaster).await
+                {
                     tracing::error!("Polling error: {}", e);
                 }
             });
         }
 
-        // Start API server
-        let api_state = ApiState {
-            register_store: self.register_store.clone(),
-        };
+        // Spawn write request handler
+        tokio::spawn(async move {
+            while let Some(request) = write_rx.recv().await {
+                // For now, acknowledge the write request
+                // In production, this would forward to the actual Modbus client
+                let _ = request.response_tx.send(Ok(()));
+                info!(
+                    "Write request received: {}@{} = {}",
+                    request.device_id, request.address, request.value
+                );
+            }
+        });
 
+        // Start API server
         let app = api::create_router(api_state);
 
         let addr: SocketAddr =
@@ -62,11 +83,88 @@ impl Bridge {
 
         info!("Starting API server on http://{}", addr);
         info!("  - Health check: http://{}/health", addr);
+        info!("  - API info:     http://{}/api/info", addr);
         info!("  - Devices:      http://{}/api/devices", addr);
+        info!("  - WebSocket:    ws://{}/ws", addr);
 
         let listener = tokio::net::TcpListener::bind(addr).await?;
         axum::serve(listener, app).await?;
 
         Ok(())
+    }
+}
+
+/// Start polling with WebSocket broadcast support
+async fn start_polling_with_broadcast(
+    config: crate::config::DeviceConfig,
+    store: RegisterStore,
+    broadcaster: tokio::sync::broadcast::Sender<RegisterUpdate>,
+) -> Result<()> {
+    use crate::modbus::ModbusClient;
+    use tokio::time::{interval, Duration};
+
+    let mut client = ModbusClient::new(&config).await?;
+    let device_id = config.id.clone();
+    let poll_interval = Duration::from_millis(config.poll_interval_ms);
+
+    info!(
+        "Starting polling for device {} every {}ms",
+        device_id, config.poll_interval_ms
+    );
+
+    let mut ticker = interval(poll_interval);
+
+    loop {
+        ticker.tick().await;
+
+        for register in &config.registers {
+            match client.read_registers(register).await {
+                Ok(raw_values) => {
+                    let value = reader::convert_value(&raw_values, register);
+
+                    let reg_value = RegisterValue {
+                        name: register.name.clone(),
+                        raw: raw_values.clone(),
+                        value,
+                        unit: register.unit.clone(),
+                        timestamp: chrono::Utc::now(),
+                    };
+
+                    // Store the value
+                    {
+                        let mut store = store.write().await;
+                        let device_map = store.entry(device_id.clone()).or_insert_with(HashMap::new);
+                        device_map.insert(register.name.clone(), reg_value.clone());
+                    }
+
+                    // Broadcast to WebSocket clients
+                    let update = RegisterUpdate {
+                        device_id: device_id.clone(),
+                        register_name: register.name.clone(),
+                        value: reg_value.value,
+                        raw: reg_value.raw,
+                        unit: reg_value.unit,
+                        timestamp: reg_value.timestamp.to_rfc3339(),
+                    };
+                    let _ = broadcaster.send(update);
+
+                    tracing::debug!(
+                        "Device {} register {} = {} {:?}",
+                        device_id,
+                        register.name,
+                        value,
+                        register.unit
+                    );
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to read register {} from {}: {}",
+                        register.name,
+                        device_id,
+                        e
+                    );
+                }
+            }
+        }
     }
 }

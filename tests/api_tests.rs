@@ -4,7 +4,7 @@
 
 use axum::{
     body::Body,
-    http::{Request, StatusCode},
+    http::{Method, Request, StatusCode},
 };
 use http_body_util::BodyExt;
 use std::collections::HashMap;
@@ -18,7 +18,8 @@ use rustbridge::modbus::reader::{RegisterStore, RegisterValue};
 /// Helper to create a test API state
 fn create_test_state() -> ApiState {
     let register_store: RegisterStore = Arc::new(RwLock::new(HashMap::new()));
-    ApiState { register_store }
+    let (write_tx, _write_rx) = tokio::sync::mpsc::channel(100);
+    ApiState::new(register_store, write_tx)
 }
 
 /// Helper to populate test data
@@ -64,7 +65,7 @@ async fn populate_test_data(state: &ApiState) {
     store.insert("sensor-001".to_string(), device2_registers);
 }
 
-/// Helper to make a request and get response body as JSON
+/// Helper to make a GET request and get response body as JSON
 async fn get_json(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
     let response = app
         .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
@@ -77,6 +78,35 @@ async fn get_json(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Valu
 
     (status, json)
 }
+
+/// Helper to make a POST request with JSON body
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri(uri)
+                .header("Content-Type", "application/json")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let status = response.status();
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap_or(serde_json::json!({}));
+
+    (status, json)
+}
+
+// ============================================================================
+// Health Endpoint Tests
+// ============================================================================
 
 #[tokio::test]
 async fn test_health_endpoint() {
@@ -91,6 +121,60 @@ async fn test_health_endpoint() {
 }
 
 #[tokio::test]
+async fn test_health_version_format() {
+    let state = create_test_state();
+    let app = create_router(state);
+
+    let (status, json) = get_json(app, "/health").await;
+
+    assert_eq!(status, StatusCode::OK);
+
+    // Version should be in semver format (e.g., "0.1.0")
+    let version = json["version"].as_str().unwrap();
+    let parts: Vec<&str> = version.split('.').collect();
+    assert_eq!(
+        parts.len(),
+        3,
+        "Version should have 3 parts (major.minor.patch)"
+    );
+
+    // Each part should be a number
+    for part in parts {
+        assert!(
+            part.parse::<u32>().is_ok(),
+            "Version part '{}' should be a number",
+            part
+        );
+    }
+}
+
+// ============================================================================
+// API Info Endpoint Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_api_info_endpoint() {
+    let state = create_test_state();
+    let app = create_router(state);
+
+    let (status, json) = get_json(app, "/api/info").await;
+
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["name"], "RustBridge API");
+    assert!(json["version"].is_string());
+    assert!(json["description"].is_string());
+    assert!(json["endpoints"].is_array());
+
+    // Verify endpoints list contains expected entries
+    let endpoints = json["endpoints"].as_array().unwrap();
+    assert!(endpoints.len() >= 8); // At least 8 endpoints defined
+}
+
+// ============================================================================
+// Device Endpoint Tests
+// ============================================================================
+
+#[tokio::test]
 async fn test_list_devices_empty() {
     let state = create_test_state();
     let app = create_router(state);
@@ -100,6 +184,7 @@ async fn test_list_devices_empty() {
     assert_eq!(status, StatusCode::OK);
     assert!(json["devices"].is_array());
     assert_eq!(json["devices"].as_array().unwrap().len(), 0);
+    assert_eq!(json["count"], 0);
 }
 
 #[tokio::test]
@@ -111,6 +196,7 @@ async fn test_list_devices_with_data() {
     let (status, json) = get_json(app, "/api/devices").await;
 
     assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["count"], 2);
 
     let devices = json["devices"].as_array().unwrap();
     assert_eq!(devices.len(), 2);
@@ -131,6 +217,7 @@ async fn test_get_device_found() {
 
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["id"], "plc-001");
+    assert_eq!(json["register_count"], 2);
 
     let registers = json["registers"].as_array().unwrap();
     assert_eq!(registers.len(), 2);
@@ -152,7 +239,61 @@ async fn test_get_device_not_found() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    // Verify error response structure
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["error"], "Device not found");
+    assert_eq!(json["code"], 404);
 }
+
+#[tokio::test]
+async fn test_device_register_count() {
+    let state = create_test_state();
+    populate_test_data(&state).await;
+    let app = create_router(state);
+
+    let (status, json) = get_json(app, "/api/devices").await;
+
+    assert_eq!(status, StatusCode::OK);
+
+    let devices = json["devices"].as_array().unwrap();
+
+    for device in devices {
+        let id = device["id"].as_str().unwrap();
+        let count = device["register_count"].as_u64().unwrap();
+
+        match id {
+            "plc-001" => assert_eq!(count, 2),
+            "sensor-001" => assert_eq!(count, 1),
+            _ => panic!("Unexpected device: {}", id),
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_device_has_last_update() {
+    let state = create_test_state();
+    populate_test_data(&state).await;
+    let app = create_router(state);
+
+    let (status, json) = get_json(app, "/api/devices").await;
+
+    assert_eq!(status, StatusCode::OK);
+
+    let devices = json["devices"].as_array().unwrap();
+
+    for device in devices {
+        assert!(device["last_update"].is_string());
+        // Verify it's a valid RFC3339 timestamp
+        let timestamp = device["last_update"].as_str().unwrap();
+        assert!(chrono::DateTime::parse_from_rfc3339(timestamp).is_ok());
+    }
+}
+
+// ============================================================================
+// Register Endpoint Tests
+// ============================================================================
 
 #[tokio::test]
 async fn test_get_registers() {
@@ -207,50 +348,12 @@ async fn test_get_register_not_found() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
-}
 
-#[tokio::test]
-async fn test_device_register_count() {
-    let state = create_test_state();
-    populate_test_data(&state).await;
-    let app = create_router(state);
-
-    let (status, json) = get_json(app, "/api/devices").await;
-
-    assert_eq!(status, StatusCode::OK);
-
-    let devices = json["devices"].as_array().unwrap();
-
-    for device in devices {
-        let id = device["id"].as_str().unwrap();
-        let count = device["register_count"].as_u64().unwrap();
-
-        match id {
-            "plc-001" => assert_eq!(count, 2),
-            "sensor-001" => assert_eq!(count, 1),
-            _ => panic!("Unexpected device: {}", id),
-        }
-    }
-}
-
-#[tokio::test]
-async fn test_device_has_last_update() {
-    let state = create_test_state();
-    populate_test_data(&state).await;
-    let app = create_router(state);
-
-    let (status, json) = get_json(app, "/api/devices").await;
-
-    assert_eq!(status, StatusCode::OK);
-
-    let devices = json["devices"].as_array().unwrap();
-
-    for device in devices {
-        assert!(device["last_update"].is_string());
-        // Verify it's a valid RFC3339 timestamp
-        let timestamp = device["last_update"].as_str().unwrap();
-        assert!(chrono::DateTime::parse_from_rfc3339(timestamp).is_ok());
-    }
+    // Verify error response structure
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["error"], "Register not found");
+    assert_eq!(json["code"], 404);
 }
 
 #[tokio::test]
@@ -268,30 +371,105 @@ async fn test_register_raw_values() {
     assert_eq!(raw[0], 250);
 }
 
+// ============================================================================
+// Write Register Tests
+// ============================================================================
+
 #[tokio::test]
-async fn test_health_version_format() {
+async fn test_write_register_device_not_found() {
     let state = create_test_state();
     let app = create_router(state);
 
-    let (status, json) = get_json(app, "/health").await;
+    let (status, json) = post_json(
+        app,
+        "/api/devices/nonexistent/registers/temperature",
+        serde_json::json!({"value": 100}),
+    )
+    .await;
 
-    assert_eq!(status, StatusCode::OK);
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Device not found");
+}
 
-    // Version should be in semver format (e.g., "0.1.0")
-    let version = json["version"].as_str().unwrap();
-    let parts: Vec<&str> = version.split('.').collect();
-    assert_eq!(
-        parts.len(),
-        3,
-        "Version should have 3 parts (major.minor.patch)"
+#[tokio::test]
+async fn test_write_register_not_found() {
+    let state = create_test_state();
+    populate_test_data(&state).await;
+    let app = create_router(state);
+
+    let (status, json) = post_json(
+        app,
+        "/api/devices/plc-001/registers/nonexistent",
+        serde_json::json!({"value": 100}),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert_eq!(json["error"], "Register not found");
+}
+
+// ============================================================================
+// WebSocket Tests (Basic)
+// ============================================================================
+
+#[tokio::test]
+async fn test_websocket_endpoint_exists() {
+    let state = create_test_state();
+    let app = create_router(state);
+
+    // Test that /ws endpoint exists and responds
+    // Note: Full WebSocket upgrade requires a real WebSocket client
+    // With oneshot(), we just verify the endpoint is routed
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/ws")
+                .header("Upgrade", "websocket")
+                .header("Connection", "upgrade")
+                .header("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
+                .header("Sec-WebSocket-Version", "13")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // With oneshot + hyper, upgrade may return 426 (Upgrade Required)
+    // This confirms the endpoint exists and is trying to upgrade
+    // A real WebSocket client test would get 101 Switching Protocols
+    assert!(
+        response.status() == StatusCode::SWITCHING_PROTOCOLS
+            || response.status() == StatusCode::UPGRADE_REQUIRED,
+        "Expected 101 or 426, got {}",
+        response.status()
     );
+}
 
-    // Each part should be a number
-    for part in parts {
-        assert!(
-            part.parse::<u32>().is_ok(),
-            "Version part '{}' should be a number",
-            part
-        );
-    }
+// ============================================================================
+// Error Response Tests
+// ============================================================================
+
+#[tokio::test]
+async fn test_error_response_structure() {
+    let state = create_test_state();
+    let app = create_router(state);
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/devices/nonexistent")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    // All error responses should have these fields
+    assert!(json["error"].is_string());
+    assert!(json["code"].is_number());
 }
