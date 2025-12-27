@@ -4,11 +4,13 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::info;
 
 use crate::api::{self, ApiState, RegisterUpdate, WriteRequest};
 use crate::config::Config;
+use crate::metrics::{self, ReadMetrics};
 use crate::modbus::reader::{self, RegisterStore, RegisterValue};
 use crate::mqtt::MqttPublisher;
 
@@ -34,8 +36,14 @@ impl Bridge {
         // Create write request channel
         let (write_tx, mut write_rx) = tokio::sync::mpsc::channel::<WriteRequest>(100);
 
-        // Create API state with broadcast channel
-        let api_state = ApiState::new(self.register_store.clone(), write_tx);
+        // Initialize Prometheus metrics if enabled
+        let api_state = if self.config.server.metrics_enabled {
+            let metrics_handle = metrics::init_metrics();
+            info!("Prometheus metrics enabled at /metrics");
+            ApiState::with_metrics(self.register_store.clone(), write_tx, metrics_handle)
+        } else {
+            ApiState::new(self.register_store.clone(), write_tx)
+        };
 
         // Clone for the polling tasks to broadcast updates
         let update_broadcaster = api_state.update_tx.clone();
@@ -97,6 +105,9 @@ impl Bridge {
         info!("  - API info:     http://{}/api/info", addr);
         info!("  - Devices:      http://{}/api/devices", addr);
         info!("  - WebSocket:    ws://{}/ws", addr);
+        if self.config.server.metrics_enabled {
+            info!("  - Metrics:      http://{}/metrics", addr);
+        }
 
         let listener = tokio::net::TcpListener::bind(addr).await?;
         axum::serve(listener, app).await?;
@@ -105,7 +116,7 @@ impl Bridge {
     }
 }
 
-/// Start polling with WebSocket broadcast support
+/// Start polling with WebSocket broadcast support and metrics
 async fn start_polling_with_broadcast(
     config: crate::config::DeviceConfig,
     store: RegisterStore,
@@ -123,15 +134,25 @@ async fn start_polling_with_broadcast(
         device_id, config.poll_interval_ms
     );
 
+    // Record device as connected
+    metrics::record_device_status(&device_id, true);
+
     let mut ticker = interval(poll_interval);
 
     loop {
         ticker.tick().await;
+        let cycle_start = Instant::now();
 
         for register in &config.registers {
+            // Start metrics timing
+            let read_metrics = ReadMetrics::start(&device_id, &register.name);
+
             match client.read_registers(register).await {
                 Ok(raw_values) => {
                     let value = reader::convert_value(&raw_values, register);
+
+                    // Record successful read metrics
+                    read_metrics.success(value);
 
                     let reg_value = RegisterValue {
                         name: register.name.clone(),
@@ -168,6 +189,9 @@ async fn start_polling_with_broadcast(
                     );
                 }
                 Err(e) => {
+                    // Record failed read metrics
+                    read_metrics.failure("modbus_error");
+
                     tracing::error!(
                         "Failed to read register {} from {}: {}",
                         register.name,
@@ -177,5 +201,9 @@ async fn start_polling_with_broadcast(
                 }
             }
         }
+
+        // Record poll cycle duration
+        let cycle_duration = cycle_start.elapsed().as_millis() as u64;
+        metrics::record_poll_cycle(&device_id, cycle_duration);
     }
 }

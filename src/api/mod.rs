@@ -9,11 +9,12 @@ use axum::{
         Path, State,
     },
     http::StatusCode,
-    response::{Json, Response},
+    response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
 };
 use futures_util::{SinkExt, StreamExt};
+use metrics_exporter_prometheus::PrometheusHandle;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -30,6 +31,7 @@ pub struct ApiState {
     pub register_store: RegisterStore,
     pub update_tx: broadcast::Sender<RegisterUpdate>,
     pub write_tx: tokio::sync::mpsc::Sender<WriteRequest>,
+    pub metrics_handle: Option<PrometheusHandle>,
 }
 
 impl ApiState {
@@ -43,6 +45,22 @@ impl ApiState {
             register_store,
             update_tx,
             write_tx,
+            metrics_handle: None,
+        }
+    }
+
+    /// Create new API state with metrics handle
+    pub fn with_metrics(
+        register_store: RegisterStore,
+        write_tx: tokio::sync::mpsc::Sender<WriteRequest>,
+        metrics_handle: PrometheusHandle,
+    ) -> Self {
+        let (update_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
+        Self {
+            register_store,
+            update_tx,
+            write_tx,
+            metrics_handle: Some(metrics_handle),
         }
     }
 
@@ -78,6 +96,8 @@ pub fn create_router(state: ApiState) -> Router {
         // Health & Info
         .route("/health", get(health))
         .route("/api/info", get(api_info))
+        // Metrics (Prometheus)
+        .route("/metrics", get(metrics_handler))
         // Devices
         .route("/api/devices", get(list_devices))
         .route("/api/devices/:device_id", get(get_device))
@@ -218,8 +238,32 @@ async fn api_info() -> Json<ApiInfoResponse> {
                 path: "/ws",
                 description: "WebSocket for real-time updates",
             },
+            EndpointInfo {
+                method: "GET",
+                path: "/metrics",
+                description: "Prometheus metrics endpoint",
+            },
         ],
     })
+}
+
+/// Prometheus metrics endpoint
+async fn metrics_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    match &state.metrics_handle {
+        Some(handle) => {
+            let metrics = handle.render();
+            (
+                StatusCode::OK,
+                [("content-type", "text/plain; version=0.0.4; charset=utf-8")],
+                metrics,
+            )
+        }
+        None => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            [("content-type", "text/plain; charset=utf-8")],
+            "Metrics not enabled".to_string(),
+        ),
+    }
 }
 
 // ============================================================================

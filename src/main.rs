@@ -10,6 +10,7 @@ use tracing_subscriber::FmtSubscriber;
 mod api;
 mod bridge;
 mod config;
+mod metrics;
 mod modbus;
 mod mqtt;
 
