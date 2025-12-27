@@ -23,6 +23,20 @@ RustBridge is a high-performance, lightweight gateway that bridges industrial Mo
 - **🐳 Docker Ready** — Single command deployment
 - **⚡ Edge Optimized** — Runs on Raspberry Pi, industrial gateways
 
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/getting-started.md) | Quick installation and first steps |
+| [Configuration](docs/configuration.md) | Complete configuration reference |
+| [API Reference](docs/api-reference.md) | REST API and WebSocket documentation |
+| [Modbus Guide](docs/modbus-guide.md) | Modbus protocol deep dive |
+| [MQTT Integration](docs/mqtt-integration.md) | MQTT broker setup and topics |
+| [Prometheus Metrics](docs/prometheus-metrics.md) | Monitoring and alerting |
+| [Deployment](docs/deployment.md) | Production deployment strategies |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
+| [Examples](docs/examples.md) | Real-world use cases |
+
 ## 🚀 Quick Start
 
 ### Option 1: Docker (Recommended)
@@ -120,6 +134,8 @@ devices:
         unit: "%"
 ```
 
+> 📖 See [Configuration Reference](docs/configuration.md) for all options.
+
 ## 🔌 API Endpoints
 
 | Endpoint | Method | Description |
@@ -145,6 +161,8 @@ devices:
 }
 ```
 
+> 📖 See [API Reference](docs/api-reference.md) for full documentation.
+
 ## 📡 MQTT Topics
 
 Data is published to: `{prefix}/{device_id}/{register_name}`
@@ -160,6 +178,8 @@ Example: `rustbridge/plc-01/temperature`
 }
 ```
 
+> 📖 See [MQTT Integration](docs/mqtt-integration.md) for broker setup.
+
 ## 📊 Prometheus Metrics
 
 Available at `/metrics` when `metrics_enabled: true`:
@@ -172,6 +192,8 @@ Available at `/metrics` when `metrics_enabled: true`:
 | `rustbridge_errors_total` | Counter | Error count by type |
 | `rustbridge_device_connected` | Gauge | Device connection status |
 | `rustbridge_poll_cycle_seconds` | Histogram | Poll cycle duration |
+
+> 📖 See [Prometheus Metrics](docs/prometheus-metrics.md) for Grafana dashboards and alerting.
 
 ## 🚢 Production Deployment
 
@@ -213,6 +235,8 @@ sudo journalctl -u rustbridge -f
 helm repo add rustbridge https://mrsarac.github.io/rustbridge
 helm install rustbridge rustbridge/rustbridge
 ```
+
+> 📖 See [Deployment Guide](docs/deployment.md) for HA setup, edge devices, and more.
 
 ## 🏗️ Architecture
 
@@ -262,6 +286,16 @@ cargo fmt
 
 ```
 rustbridge/
+├── docs/                # 📚 Documentation
+│   ├── getting-started.md
+│   ├── configuration.md
+│   ├── api-reference.md
+│   ├── modbus-guide.md
+│   ├── mqtt-integration.md
+│   ├── prometheus-metrics.md
+│   ├── deployment.md
+│   ├── troubleshooting.md
+│   └── examples.md
 ├── src/
 │   ├── main.rs          # Entry point
 │   ├── lib.rs           # Library exports
