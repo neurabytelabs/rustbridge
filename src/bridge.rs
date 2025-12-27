@@ -165,7 +165,8 @@ async fn start_polling_with_broadcast(
                     // Store the value
                     {
                         let mut store = store.write().await;
-                        let device_map = store.entry(device_id.clone()).or_insert_with(HashMap::new);
+                        let device_map =
+                            store.entry(device_id.clone()).or_insert_with(HashMap::new);
                         device_map.insert(register.name.clone(), reg_value.clone());
                     }
 

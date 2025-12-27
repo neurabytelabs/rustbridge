@@ -532,10 +532,7 @@ enum WsMessage {
     Pong,
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<Arc<ApiState>>,
-) -> Response {
+async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<ApiState>>) -> Response {
     ws.on_upgrade(|socket| handle_socket(socket, state))
 }
 
