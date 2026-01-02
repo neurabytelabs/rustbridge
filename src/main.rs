@@ -59,7 +59,7 @@ fn print_banner() {
     ║                                                               ║
     ║   Industrial Protocol Bridge                                  ║
     ║   Modbus TCP/RTU → JSON/MQTT Gateway                         ║
-    ║   https://github.com/mrsarac/rustbridge                       ║
+    ║   https://github.com/neurabytelabs/rustbridge                  ║
     ║                                                               ║
     ╚═══════════════════════════════════════════════════════════════╝
     "#
