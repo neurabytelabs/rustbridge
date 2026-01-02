@@ -6,12 +6,12 @@
 pub mod auth;
 
 use axum::{
-    middleware,
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         Path, State,
     },
     http::StatusCode,
+    middleware,
     response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
@@ -123,10 +123,7 @@ pub fn create_router(state: ApiState, auth_config: AuthConfig) -> Router {
         // WebSocket
         .route("/ws", get(ws_handler))
         // Apply API key authentication middleware
-        .layer(middleware::from_fn_with_state(
-            auth_state,
-            api_key_auth,
-        ))
+        .layer(middleware::from_fn_with_state(auth_state, api_key_auth))
         .with_state(Arc::new(state))
 }
 

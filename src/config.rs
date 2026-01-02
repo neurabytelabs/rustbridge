@@ -44,10 +44,7 @@ impl Default for AuthConfig {
 
 impl AuthConfig {
     fn default_exclude_paths() -> Vec<String> {
-        vec![
-            "/health".to_string(),
-            "/metrics".to_string(),
-        ]
+        vec!["/health".to_string(), "/metrics".to_string()]
     }
 }
 
