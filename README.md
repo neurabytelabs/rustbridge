@@ -298,7 +298,7 @@ rustbridge/
 
 - Optional API key authentication, configured under `auth:` in `config.yaml`. It is off unless `auth.enabled: true`.
 - The Docker image runs as a non-root user and the systemd unit sets hardening options (see `Dockerfile` and `deploy/systemd/rustbridge.service`).
-- MQTT TLS and rate limiting: not verified; do not rely on them.
+- MQTT TLS and rate limiting are not implemented. The MQTT connection is plain TCP.
 
 Example with authentication enabled:
 
