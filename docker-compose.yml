@@ -17,7 +17,7 @@ services:
   # ---------------------------------------------------------------------------
   rustbridge:
     build: .
-    image: mrsarac/rustbridge:latest
+    image: rustbridge:local
     container_name: rustbridge
     ports:
       - "3000:3000"

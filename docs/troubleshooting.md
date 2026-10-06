@@ -379,7 +379,7 @@ RUST_LOG=debug ./rustbridge
 ## Getting Help
 
 1. **Check logs** with debug level enabled
-2. **Search GitHub Issues:** https://github.com/mrsarac/rustbridge/issues
+2. **Search GitHub Issues:** https://github.com/neurabytelabs/rustbridge/issues
 3. **Open new issue** with:
    - RustBridge version
    - Configuration (remove sensitive data)

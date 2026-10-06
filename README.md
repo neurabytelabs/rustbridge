@@ -1,46 +1,42 @@
-# 🌉 RustBridge
+# RustBridge
+
+RustBridge is a gateway written in Rust that reads Modbus TCP and RTU devices and publishes the values over a REST API, WebSocket, MQTT and Prometheus metrics.
+
+**Status:** Prototype (v0.2.0). CI is green and the repo has 63 tests. I have not tested it against real PLCs or serial hardware, and I have not measured throughput. **Live demo:** none. An earlier demo host (`rustbridge.mustafasarac.com`) is offline and returns 503.
 
 [![CI](https://github.com/neurabytelabs/rustbridge/actions/workflows/ci.yml/badge.svg)](https://github.com/neurabytelabs/rustbridge/actions/workflows/ci.yml)
-[![Release](https://github.com/neurabytelabs/rustbridge/actions/workflows/release.yml/badge.svg)](https://github.com/neurabytelabs/rustbridge/actions/workflows/release.yml)
-[![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://ghcr.io/neurabytelabs/rustbridge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**Industrial Protocol Bridge - Modbus TCP/RTU to JSON/MQTT Gateway**
-
-RustBridge is a high-performance, lightweight gateway that bridges industrial Modbus devices to modern IoT infrastructure. Built with Rust for reliability, speed, and minimal resource usage.
-
-> 🏭 *"Connecting legacy PLCs to the cloud, one register at a time."*
-
-## 🌐 Live Demo
-
-Try the API without installing anything:
+## Run it
 
 ```bash
-# Health check
-curl https://rustbridge.mustafasarac.com/health
-
-# API info
-curl https://rustbridge.mustafasarac.com/api/info
-
-# Prometheus metrics
-curl https://rustbridge.mustafasarac.com/metrics
+git clone https://github.com/neurabytelabs/rustbridge.git
+cd rustbridge
+cargo test               # 63 tests
+cargo run --release      # reads ./config.yaml, API on http://localhost:3000
+curl http://localhost:3000/health
 ```
 
-**Demo URL:** [rustbridge.mustafasarac.com](https://rustbridge.mustafasarac.com)
+I ran this on macOS: `/health` and `/api/info` answered. The default `config.yaml` points at an MQTT broker on localhost; without one the log shows connection errors but the API keeps running.
 
-## ✨ Features
+With Docker: `docker compose up -d` builds the image from the `Dockerfile` and starts a Mosquitto broker next to it. I have not run this compose file myself.
 
-- **🚀 High Performance** — Handles 1000+ registers per second
-- **🔌 Dual Protocol** — Modbus TCP and RTU (serial) support
-- **📡 MQTT Publisher** — Real-time data streaming to any MQTT broker
-- **🌐 REST API** — JSON endpoints for integration
-- **📊 WebSocket** — Real-time updates for dashboards
-- **📈 Prometheus Metrics** — Production-ready monitoring
-- **🐳 Docker Ready** — Single command deployment
-- **⚡ Edge Optimized** — Runs on Raspberry Pi, industrial gateways
+Release binaries (Linux x86_64, macOS Intel, macOS Apple Silicon) are on the [releases page](https://github.com/neurabytelabs/rustbridge/releases).
 
-## 📚 Documentation
+## Release numbering
+
+The tag order looks wrong: `v1.0.0` was created on 2025-12-27 and `v0.2.0` on 2026-01-02. The code at `v1.0.0` has `version = "0.1.0"` in `Cargo.toml`, so that release is really 0.1.0 and the 1.0.0 name was a mistake. The version in `Cargo.toml` and `CHANGELOG.md` is the real one; the latest release is `v0.2.0`. The old release was kept so existing download links keep working.
+
+## Features
+
+- Modbus TCP and RTU (serial) clients with per-device polling.
+- Register types: holding, input, coil, discrete input. Data types: u16, i16, u32, i32, f32, bool, with scale and offset.
+- REST API and a WebSocket stream of register updates.
+- MQTT publisher with a configurable topic prefix and QoS.
+- Prometheus metrics at `/metrics`.
+- Optional API key authentication (`X-API-Key` header).
+
+## Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -54,45 +50,7 @@ curl https://rustbridge.mustafasarac.com/metrics
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 | [Examples](docs/examples.md) | Real-world use cases |
 
-## 🚀 Quick Start
-
-### Option 1: Docker (Recommended)
-
-```bash
-# Simple run
-docker run -d \
-  -p 3000:3000 \
-  -v ./config.yaml:/app/config.yaml \
-  ghcr.io/neurabytelabs/rustbridge:latest
-
-# With Docker Compose (includes MQTT broker)
-docker compose up -d
-```
-
-### Option 2: Download Binary
-
-Download the latest release for your platform from [GitHub Releases](https://github.com/neurabytelabs/rustbridge/releases):
-
-- **Linux x86_64**: `rustbridge-x86_64-unknown-linux-gnu`
-- **Linux ARM64**: `rustbridge-aarch64-unknown-linux-gnu`
-- **macOS Intel**: `rustbridge-x86_64-apple-darwin`
-- **macOS Apple Silicon**: `rustbridge-aarch64-apple-darwin`
-
-```bash
-chmod +x rustbridge-*
-./rustbridge-x86_64-unknown-linux-gnu
-```
-
-### Option 3: From Source
-
-```bash
-git clone https://github.com/neurabytelabs/rustbridge.git
-cd rustbridge
-cargo build --release
-./target/release/rustbridge
-```
-
-## 📝 Configuration
+## Configuration
 
 Create a `config.yaml` file:
 
@@ -161,9 +119,9 @@ devices:
         unit: "%"
 ```
 
-> 📖 See [Configuration Reference](docs/configuration.md) for all options.
+> See [Configuration Reference](docs/configuration.md) for all options.
 
-## 🔌 API Endpoints
+## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -188,9 +146,9 @@ devices:
 }
 ```
 
-> 📖 See [API Reference](docs/api-reference.md) for full documentation.
+> See [API Reference](docs/api-reference.md) for full documentation.
 
-## 📡 MQTT Topics
+## MQTT Topics
 
 Data is published to: `{prefix}/{device_id}/{register_name}`
 
@@ -205,9 +163,9 @@ Example: `rustbridge/plc-01/temperature`
 }
 ```
 
-> 📖 See [MQTT Integration](docs/mqtt-integration.md) for broker setup.
+> See [MQTT Integration](docs/mqtt-integration.md) for broker setup.
 
-## 📊 Prometheus Metrics
+## Prometheus Metrics
 
 Available at `/metrics` when `metrics_enabled: true`:
 
@@ -220,11 +178,11 @@ Available at `/metrics` when `metrics_enabled: true`:
 | `rustbridge_device_connected` | Gauge | Device connection status |
 | `rustbridge_poll_cycle_seconds` | Histogram | Poll cycle duration |
 
-> 📖 See [Prometheus Metrics](docs/prometheus-metrics.md) for Grafana dashboards and alerting.
+> See [Prometheus Metrics](docs/prometheus-metrics.md) for Grafana dashboards and alerting.
 
-## 🚢 Production Deployment
+## Production Deployment
 
-### Docker Compose (Recommended)
+### Docker Compose
 
 ```bash
 # Production stack
@@ -255,17 +213,9 @@ sudo systemctl status rustbridge
 sudo journalctl -u rustbridge -f
 ```
 
-### Kubernetes / Helm
+> See [Deployment Guide](docs/deployment.md) for HA setup, edge devices, and more.
 
-```yaml
-# Coming soon - Helm chart
-helm repo add rustbridge https://neurabytelabs.github.io/rustbridge
-helm install rustbridge rustbridge/rustbridge
-```
-
-> 📖 See [Deployment Guide](docs/deployment.md) for HA setup, edge devices, and more.
-
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -290,7 +240,7 @@ helm install rustbridge rustbridge/rustbridge
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🛠️ Development
+## Development
 
 ```bash
 # Run tests
@@ -309,7 +259,7 @@ cargo clippy
 cargo fmt
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 rustbridge/
@@ -344,51 +294,24 @@ rustbridge/
 └── docker-compose.yml   # Full stack deployment
 ```
 
-## 🔒 Security
+## Security
 
-- **🔑 API Key Authentication** — Secure endpoints with `X-API-Key` header
-- Non-root Docker container
-- systemd security hardening
-- TLS support for MQTT connections
-- Rate limiting (coming soon)
+- Optional API key authentication, configured under `auth:` in `config.yaml`. It is off unless `auth.enabled: true`.
+- The Docker image runs as a non-root user and the systemd unit sets hardening options (see `Dockerfile` and `deploy/systemd/rustbridge.service`).
+- MQTT TLS and rate limiting are not implemented. The MQTT connection is plain TCP.
 
-### API Authentication
-
-Enable API key authentication in your `config.yaml`:
-
-```yaml
-auth:
-  enabled: true
-  api_keys:
-    - "your-secret-api-key"
-  exclude_paths:
-    - "/health"
-    - "/metrics"
-```
-
-Then include the key in requests:
+Example with authentication enabled:
 
 ```bash
-curl -H "X-API-Key: your-secret-api-key" https://rustbridge.example.com/api/devices
+curl -H "X-API-Key: your-secret-api-key" http://localhost:3000/api/devices
 ```
 
-> 📖 See [API Reference](docs/api-reference.md) for authentication details.
+## License
 
-## 📜 License
+MIT. See [LICENSE](LICENSE).
 
-MIT License - See [LICENSE](LICENSE) for details.
+## Support
 
-## 🤝 Contributing
+Open an issue: [github.com/neurabytelabs/rustbridge/issues](https://github.com/neurabytelabs/rustbridge/issues)
 
-Contributions are welcome! Please read our contributing guidelines.
-
-## 📞 Support
-
-- GitHub Issues: [github.com/neurabytelabs/rustbridge/issues](https://github.com/neurabytelabs/rustbridge/issues)
-- Email: mrsarac@gmail.com
-
----
-
-Built with ❤️ by [NeuraByte Labs](https://neurabytelabs.com)
-
-*Part of the Conatus Protocol - Industrial Edge AI Initiative*
+Built by Mustafa Saraç ([NeuraByte Labs](https://neurabytelabs.com)).

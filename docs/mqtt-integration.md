@@ -63,6 +63,8 @@ mqtt:
 
 ### With TLS
 
+> Not implemented. `src/config.rs` has no TLS options and `rumqttc` is built without its TLS feature (since the dependency update that removed vulnerable `rustls-webpki`). The example below describes a planned configuration and does not work today.
+
 ```yaml
 mqtt:
   enabled: true
@@ -165,7 +167,7 @@ version: '3.8'
 
 services:
   rustbridge:
-    image: ghcr.io/mrsarac/rustbridge:latest
+    image: ghcr.io/neurabytelabs/rustbridge:latest
     ports:
       - "3000:3000"
     volumes:

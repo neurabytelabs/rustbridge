@@ -50,5 +50,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TLS support for MQTT
 - Write register functionality
 
-[Unreleased]: https://github.com/mrsarac/rustbridge/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/mrsarac/rustbridge/releases/tag/v0.1.0
+[Unreleased]: https://github.com/neurabytelabs/rustbridge/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/neurabytelabs/rustbridge/releases/tag/v0.1.0

@@ -14,13 +14,13 @@ This guide will help you get RustBridge up and running in under 5 minutes.
 
 ```bash
 # Pull the latest image
-docker pull ghcr.io/mrsarac/rustbridge:latest
+docker pull ghcr.io/neurabytelabs/rustbridge:latest
 
 # Run with default config
 docker run -d \
   --name rustbridge \
   -p 3000:3000 \
-  ghcr.io/mrsarac/rustbridge:latest
+  ghcr.io/neurabytelabs/rustbridge:latest
 
 # Check if it's running
 curl http://localhost:3000/health
@@ -30,7 +30,7 @@ curl http://localhost:3000/health
 
 ```bash
 # Clone the repository
-git clone https://github.com/mrsarac/rustbridge.git
+git clone https://github.com/neurabytelabs/rustbridge.git
 cd rustbridge
 
 # Start with MQTT broker
@@ -45,12 +45,11 @@ docker compose --profile dev up -d
 
 ### Option 3: Download Binary
 
-Download from [GitHub Releases](https://github.com/mrsarac/rustbridge/releases):
+Download from [GitHub Releases](https://github.com/neurabytelabs/rustbridge/releases):
 
 | Platform | Binary |
 |----------|--------|
 | Linux x86_64 | `rustbridge-x86_64-unknown-linux-gnu` |
-| Linux ARM64 | `rustbridge-aarch64-unknown-linux-gnu` |
 | macOS Intel | `rustbridge-x86_64-apple-darwin` |
 | macOS Apple Silicon | `rustbridge-aarch64-apple-darwin` |
 
@@ -69,7 +68,7 @@ chmod +x rustbridge-*
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Clone and build
-git clone https://github.com/mrsarac/rustbridge.git
+git clone https://github.com/neurabytelabs/rustbridge.git
 cd rustbridge
 cargo build --release
 

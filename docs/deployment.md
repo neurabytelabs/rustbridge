@@ -18,7 +18,7 @@ This guide covers deploying RustBridge in production environments.
 
 ```bash
 # Clone repository
-git clone https://github.com/mrsarac/rustbridge.git
+git clone https://github.com/neurabytelabs/rustbridge.git
 cd rustbridge
 
 # Create production config
@@ -73,7 +73,7 @@ services:
 
 ```bash
 # Download binary
-wget https://github.com/mrsarac/rustbridge/releases/latest/download/rustbridge-x86_64-unknown-linux-gnu
+wget https://github.com/neurabytelabs/rustbridge/releases/latest/download/rustbridge-x86_64-unknown-linux-gnu
 mv rustbridge-x86_64-unknown-linux-gnu /usr/local/bin/rustbridge
 chmod +x /usr/local/bin/rustbridge
 
@@ -144,9 +144,11 @@ kill -HUP $(pidof rustbridge)
 
 ### ARM64 Installation
 
+> No Linux ARM64 binary is attached to the releases (only Linux x86_64 and macOS). Build from source on the device with `cargo build --release`. The commands below describe the intended file name and will not work until such a binary is published.
+
 ```bash
 # Download ARM64 binary
-wget https://github.com/mrsarac/rustbridge/releases/latest/download/rustbridge-aarch64-unknown-linux-gnu
+wget https://github.com/neurabytelabs/rustbridge/releases/latest/download/rustbridge-aarch64-unknown-linux-gnu
 mv rustbridge-aarch64-unknown-linux-gnu /usr/local/bin/rustbridge
 chmod +x /usr/local/bin/rustbridge
 
@@ -202,7 +204,7 @@ spec:
     spec:
       containers:
       - name: rustbridge
-        image: ghcr.io/mrsarac/rustbridge:latest
+        image: ghcr.io/neurabytelabs/rustbridge:latest
         ports:
         - containerPort: 3000
         volumeMounts:

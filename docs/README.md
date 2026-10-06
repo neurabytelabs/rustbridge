@@ -61,15 +61,14 @@ RustBridge periodically reads registers from devices and broadcasts the values t
 
 ## 🚀 Quick Links
 
-- [GitHub Repository](https://github.com/mrsarac/rustbridge)
-- [Docker Image](https://ghcr.io/mrsarac/rustbridge)
-- [Release Downloads](https://github.com/mrsarac/rustbridge/releases)
-- [Issue Tracker](https://github.com/mrsarac/rustbridge/issues)
+- [GitHub Repository](https://github.com/neurabytelabs/rustbridge)
+- [Docker Image](https://ghcr.io/neurabytelabs/rustbridge)
+- [Release Downloads](https://github.com/neurabytelabs/rustbridge/releases)
+- [Issue Tracker](https://github.com/neurabytelabs/rustbridge/issues)
 
 ## 📞 Support
 
 - **GitHub Issues**: Report bugs and request features
-- **Email**: mrsarac@gmail.com
 - **Company**: [NeuraByte Labs](https://neurabytelabs.com)
 
 ---
