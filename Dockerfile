@@ -84,7 +84,7 @@ ENV RUSTBRIDGE_CONFIG=/app/config.yaml
 # Labels
 LABEL org.opencontainers.image.title="RustBridge"
 LABEL org.opencontainers.image.description="Industrial Protocol Bridge - Modbus TCP/RTU to JSON/MQTT Gateway"
-LABEL org.opencontainers.image.source="https://github.com/mrsarac/rustbridge"
+LABEL org.opencontainers.image.source="https://github.com/neurabytelabs/rustbridge"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Run the application

@@ -165,7 +165,7 @@ version: '3.8'
 
 services:
   rustbridge:
-    image: ghcr.io/mrsarac/rustbridge:latest
+    image: ghcr.io/neurabytelabs/rustbridge:latest
     ports:
       - "3000:3000"
     volumes:

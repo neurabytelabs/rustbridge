@@ -20,7 +20,7 @@
 
 [Unit]
 Description=RustBridge - Industrial Protocol Bridge
-Documentation=https://github.com/mrsarac/rustbridge
+Documentation=https://github.com/neurabytelabs/rustbridge
 After=network-online.target
 Wants=network-online.target
 

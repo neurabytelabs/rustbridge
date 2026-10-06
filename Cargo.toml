@@ -2,11 +2,11 @@
 name = "rustbridge"
 version = "0.2.0"
 edition = "2021"
-authors = ["Mustafa Sarac <mrsarac@gmail.com>"]
+authors = ["Mustafa Sarac"]
 description = "Industrial Protocol Bridge - Modbus TCP/RTU to JSON/MQTT Gateway"
 license = "MIT"
 repository = "https://github.com/neurabytelabs/rustbridge"
-keywords = ["modbus", "mqtt", "industrial", "iot", "gateway", "industry-4.0"]
+keywords = ["modbus", "mqtt", "industrial", "iot", "gateway"]
 categories = ["network-programming", "embedded", "hardware-support"]
 readme = "README.md"
 
