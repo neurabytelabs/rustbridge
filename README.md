@@ -1,58 +1,78 @@
 # RustBridge
 
-RustBridge is a gateway written in Rust that reads Modbus TCP and RTU devices and publishes the values over a REST API, WebSocket, MQTT and Prometheus metrics.
+A Rust gateway that polls Modbus TCP and RTU devices and exposes the register values over REST, WebSocket, MQTT and Prometheus metrics.
 
-**Status:** Prototype (v0.2.0). CI is green and the repo has 63 tests. I have not tested it against real PLCs or serial hardware, and I have not measured throughput. **Live demo:** none. An earlier demo host (`rustbridge.mustafasarac.com`) is offline and returns 503.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/neurabytelabs/rustbridge)](https://github.com/neurabytelabs/rustbridge/releases)
 
-[![CI](https://github.com/neurabytelabs/rustbridge/actions/workflows/ci.yml/badge.svg)](https://github.com/neurabytelabs/rustbridge/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## Why
 
-## Run it
+PLCs and sensors usually speak Modbus; dashboards, scripts and message brokers usually do not. RustBridge sits in between: you describe devices and registers in one YAML file, it polls them, converts raw registers to typed and scaled values, and serves the latest values to HTTP clients, WebSocket subscribers, an MQTT broker and Prometheus.
+
+There is no live demo.
+
+## Quick start
+
+Requires a Rust toolchain (the Dockerfile builds with Rust 1.91).
 
 ```bash
 git clone https://github.com/neurabytelabs/rustbridge.git
 cd rustbridge
-cargo test               # 63 tests
+cargo test               # unit + API tests
 cargo run --release      # reads ./config.yaml, API on http://localhost:3000
 curl http://localhost:3000/health
 ```
 
-I ran this on macOS: `/health` and `/api/info` answered. The default `config.yaml` points at an MQTT broker on localhost; without one the log shows connection errors but the API keeps running.
-
-With Docker: `docker compose up -d` builds the image from the `Dockerfile` and starts a Mosquitto broker next to it. I have not run this compose file myself.
+`cargo run` reads `config.yaml` from the working directory; set `RUSTBRIDGE_CONFIG` to use another path. The bundled `config.yaml` expects an MQTT broker on `localhost:1883` and a Modbus device on port 5020. Without them the log shows connection errors, but the API still starts.
 
 Release binaries (Linux x86_64, macOS Intel, macOS Apple Silicon) are on the [releases page](https://github.com/neurabytelabs/rustbridge/releases).
 
-## Release numbering
+### Docker Compose
 
-The tag order looks wrong: `v1.0.0` was created on 2025-12-27 and `v0.2.0` on 2026-01-02. The code at `v1.0.0` has `version = "0.1.0"` in `Cargo.toml`, so that release is really 0.1.0 and the 1.0.0 name was a mistake. The version in `Cargo.toml` and `CHANGELOG.md` is the real one; the latest release is `v0.2.0`. The old release was kept so existing download links keep working.
+```bash
+docker compose up -d                          # RustBridge + Mosquitto
+docker compose --profile monitoring up -d     # + Prometheus (:9090) and Grafana (:3001)
+docker compose --profile dev up -d            # + a Modbus TCP simulator on :5020
+```
 
-## Features
+The compose file mounts `./config.yaml` into the container. Inside the container `localhost` is not the broker, so set `mqtt.host: "mosquitto"` (and device hosts to reachable IP addresses) before starting it. Grafana's default login is set in `.env.example`; change it.
 
-- Modbus TCP and RTU (serial) clients with per-device polling.
-- Register types: holding, input, coil, discrete input. Data types: u16, i16, u32, i32, f32, bool, with scale and offset.
+### systemd (bare metal)
+
+```bash
+cd deploy
+sudo ./install.sh        # builds the release binary if needed, installs the unit
+sudo systemctl start rustbridge
+sudo journalctl -u rustbridge -f
+```
+
+## How it works
+
+```mermaid
+flowchart LR
+    D[Modbus TCP / RTU devices] -->|poll per device| P[Polling task]
+    P --> S[(Latest values)]
+    P --> B[Broadcast channel]
+    S --> API[REST API]
+    B --> WS[WebSocket /ws]
+    B --> M[MQTT publisher]
+    P --> X[Prometheus /metrics]
+```
+
+Each device in `config.yaml` gets its own polling task. Raw registers are converted to `u16`, `i16`, `u32`, `i32`, `f32` or `bool`, then `scale` and `offset` are applied. The latest value per register is kept in memory for the REST API, and every update is broadcast to WebSocket clients and the MQTT publisher.
+
+Features:
+
+- Modbus TCP and RTU (serial) clients with per-device poll intervals.
+- Register types: holding, input, coil, discrete input.
 - REST API and a WebSocket stream of register updates.
-- MQTT publisher with a configurable topic prefix and QoS.
+- MQTT publisher with configurable topic prefix, QoS and retain.
 - Prometheus metrics at `/metrics`.
 - Optional API key authentication (`X-API-Key` header).
 
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/getting-started.md) | Quick installation and first steps |
-| [Configuration](docs/configuration.md) | Complete configuration reference |
-| [API Reference](docs/api-reference.md) | REST API and WebSocket documentation |
-| [Modbus Guide](docs/modbus-guide.md) | Modbus protocol deep dive |
-| [MQTT Integration](docs/mqtt-integration.md) | MQTT broker setup and topics |
-| [Prometheus Metrics](docs/prometheus-metrics.md) | Monitoring and alerting |
-| [Deployment](docs/deployment.md) | Production deployment strategies |
-| [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
-| [Examples](docs/examples.md) | Real-world use cases |
-
 ## Configuration
 
-Create a `config.yaml` file:
+A minimal `config.yaml`:
 
 ```yaml
 server:
@@ -69,23 +89,21 @@ mqtt:
   qos: 1
   retain: false
 
-# API Authentication (optional)
+# Optional API key authentication
 auth:
   enabled: true
   api_keys:
-    - "your-secret-key-1"
-    - "your-secret-key-2"
+    - "change-me"
   exclude_paths:
     - "/health"
     - "/metrics"
 
 devices:
-  # Modbus TCP device
   - id: "plc-01"
     name: "Main PLC"
     device_type: tcp
     connection:
-      host: "192.168.1.100"
+      host: "192.168.1.100"   # IP address; hostnames are not resolved
       port: 502
       unit_id: 1
     poll_interval_ms: 1000
@@ -98,7 +116,6 @@ devices:
         unit: "°C"
         scale: 0.1
 
-  # Modbus RTU (Serial) device
   - id: "sensor-01"
     name: "RTU Sensor"
     device_type: rtu
@@ -119,22 +136,28 @@ devices:
         unit: "%"
 ```
 
-> See [Configuration Reference](docs/configuration.md) for all options.
+See [docs/configuration.md](docs/configuration.md) for all options.
 
-## API Endpoints
+## API
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/metrics` | GET | Prometheus metrics |
 | `/api/info` | GET | API information |
-| `/api/devices` | GET | List all devices |
-| `/api/devices/:id` | GET | Get device details |
-| `/api/devices/:id/registers` | GET | Get all register values |
-| `/api/devices/:id/registers/:name` | GET/POST | Get/Write register |
-| `/ws` | WebSocket | Real-time updates |
+| `/api/devices` | GET | List devices |
+| `/api/devices/:id` | GET | Device details |
+| `/api/devices/:id/registers` | GET | All register values of a device |
+| `/api/devices/:id/registers/:name` | GET / POST | Read a register / write request (see limits) |
+| `/ws` | WebSocket | Register updates |
 
-### Example Response
+With authentication enabled:
+
+```bash
+curl -H "X-API-Key: change-me" http://localhost:3000/api/devices
+```
+
+Example register value:
 
 ```json
 {
@@ -146,172 +169,50 @@ devices:
 }
 ```
 
-> See [API Reference](docs/api-reference.md) for full documentation.
+MQTT messages go to `{topic_prefix}/{device_id}/{register_name}`, e.g. `rustbridge/plc-01/temperature`.
 
-## MQTT Topics
+Prometheus metrics (all prefixed `rustbridge_`): `register_reads_total`, `errors_total`, `mqtt_publishes_total` (counters); `register_value`, `device_connected`, `active_devices`, `mqtt_connected`, `websocket_connections` (gauges); `read_duration_seconds`, `poll_cycle_seconds` (histograms).
 
-Data is published to: `{prefix}/{device_id}/{register_name}`
+Full reference: [docs/api-reference.md](docs/api-reference.md), [docs/mqtt-integration.md](docs/mqtt-integration.md), [docs/prometheus-metrics.md](docs/prometheus-metrics.md).
 
-Example: `rustbridge/plc-01/temperature`
+## Documentation
 
-```json
-{
-  "value": 72.4,
-  "raw": [724],
-  "unit": "°C",
-  "timestamp": "2025-12-26T23:15:00Z"
-}
-```
-
-> See [MQTT Integration](docs/mqtt-integration.md) for broker setup.
-
-## Prometheus Metrics
-
-Available at `/metrics` when `metrics_enabled: true`:
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| `rustbridge_register_reads_total` | Counter | Total register read attempts |
-| `rustbridge_read_duration_seconds` | Histogram | Read latency distribution |
-| `rustbridge_register_value` | Gauge | Current register values |
-| `rustbridge_errors_total` | Counter | Error count by type |
-| `rustbridge_device_connected` | Gauge | Device connection status |
-| `rustbridge_poll_cycle_seconds` | Histogram | Poll cycle duration |
-
-> See [Prometheus Metrics](docs/prometheus-metrics.md) for Grafana dashboards and alerting.
-
-## Production Deployment
-
-### Docker Compose
-
-```bash
-# Production stack
-docker compose up -d
-
-# With monitoring (Prometheus + Grafana)
-docker compose --profile monitoring up -d
-
-# With Modbus simulator for testing
-docker compose --profile dev up -d
-```
-
-Access:
-- RustBridge API: http://localhost:3000
-- Prometheus: http://localhost:9090 (with monitoring profile)
-- Grafana: http://localhost:3001 (admin/rustbridge)
-
-### systemd Service (Bare Metal)
-
-```bash
-# Install
-cd deploy
-sudo ./install.sh
-
-# Control
-sudo systemctl start rustbridge
-sudo systemctl status rustbridge
-sudo journalctl -u rustbridge -f
-```
-
-> See [Deployment Guide](docs/deployment.md) for HA setup, edge devices, and more.
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        RUSTBRIDGE                           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────┐    ┌──────────┐    ┌────────┐    ┌─────────┐  │
-│  │ Modbus  │───▶│ Polling  │───▶│Broadcast│──▶│  MQTT   │  │
-│  │TCP/RTU  │    │ Engine   │    │ Channel │   │Publisher│  │
-│  └─────────┘    └──────────┘    └────────┘    └─────────┘  │
-│                                      │                      │
-│                                      ▼                      │
-│                      ┌──────────────────────────┐          │
-│                      │      REST API + WS       │          │
-│                      │    (/api, /ws, /metrics) │          │
-│                      └──────────────────────────┘          │
-│                                      │                      │
-│                                      ▼                      │
-│                      ┌──────────────────────────┐          │
-│                      │   Prometheus + Grafana   │          │
-│                      └──────────────────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-```
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/getting-started.md) | Installation and first steps |
+| [Configuration](docs/configuration.md) | Configuration reference |
+| [API Reference](docs/api-reference.md) | REST API and WebSocket |
+| [Modbus Guide](docs/modbus-guide.md) | Modbus background |
+| [MQTT Integration](docs/mqtt-integration.md) | Broker setup and topics |
+| [Prometheus Metrics](docs/prometheus-metrics.md) | Monitoring |
+| [Deployment](docs/deployment.md) | Docker, systemd and other setups |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues |
+| [Examples](docs/examples.md) | Example configurations |
 
 ## Development
 
 ```bash
-# Run tests
 cargo test
-
-# Run with logging
 RUST_LOG=debug cargo run
-
-# Build release
-cargo build --release
-
-# Run clippy
 cargo clippy
-
-# Format code
 cargo fmt
 ```
 
-## Project Structure
+Source layout: `src/config.rs` (YAML config), `src/bridge.rs` (wiring), `src/modbus/` (TCP/RTU client and value conversion), `src/api/` (REST, WebSocket, auth), `src/mqtt/`, `src/metrics/`. Deployment files are in `deploy/`.
 
-```
-rustbridge/
-├── docs/                # 📚 Documentation
-│   ├── getting-started.md
-│   ├── configuration.md
-│   ├── api-reference.md
-│   ├── modbus-guide.md
-│   ├── mqtt-integration.md
-│   ├── prometheus-metrics.md
-│   ├── deployment.md
-│   ├── troubleshooting.md
-│   └── examples.md
-├── src/
-│   ├── main.rs          # Entry point
-│   ├── lib.rs           # Library exports
-│   ├── config.rs        # Configuration parsing
-│   ├── bridge.rs        # Main orchestration
-│   ├── api/             # REST API + WebSocket
-│   ├── modbus/          # Modbus TCP/RTU client
-│   ├── mqtt/            # MQTT publisher
-│   └── metrics/         # Prometheus metrics
-├── deploy/
-│   ├── mosquitto/       # MQTT broker config
-│   ├── prometheus/      # Prometheus config
-│   ├── grafana/         # Grafana provisioning
-│   ├── systemd/         # systemd service file
-│   ├── install.sh       # Installation script
-│   └── uninstall.sh     # Uninstallation script
-├── config.yaml          # Example configuration
-├── Dockerfile           # Multi-stage build
-└── docker-compose.yml   # Full stack deployment
-```
+## Status / limits
 
-## Security
+Prototype, version 0.2.0.
 
-- Optional API key authentication, configured under `auth:` in `config.yaml`. It is off unless `auth.enabled: true`.
-- The Docker image runs as a non-root user and the systemd unit sets hardening options (see `Dockerfile` and `deploy/systemd/rustbridge.service`).
-- MQTT TLS and rate limiting are not implemented. The MQTT connection is plain TCP.
+- Tested with the unit and API tests in this repo only. It has not been run against real PLCs or serial hardware, and throughput has not been measured.
+- `POST /api/devices/:id/registers/:name` validates and acknowledges the request, but the write is not yet forwarded to the Modbus device (see `src/bridge.rs`).
+- If a device is unreachable when RustBridge starts, its polling task exits and is not retried; restart the process once the device is up.
+- Modbus TCP `host` must be an IP address. A hostname such as `localhost` fails with "Invalid TCP address" (this includes the bundled `config.yaml`; use `127.0.0.1`).
+- No MQTT TLS and no rate limiting. API auth is off unless `auth.enabled: true`.
+- Release numbering: the `v1.0.0` tag (2025-12-27) is older than `v0.2.0` (2026-01-02). The code at `v1.0.0` has `version = "0.1.0"` in `Cargo.toml`, so that release is really 0.1.0. `Cargo.toml` and [CHANGELOG.md](CHANGELOG.md) hold the real version; the old release is kept so existing download links keep working.
 
-Example with authentication enabled:
-
-```bash
-curl -H "X-API-Key: your-secret-api-key" http://localhost:3000/api/devices
-```
+Bug reports: [issues](https://github.com/neurabytelabs/rustbridge/issues).
 
 ## License
 
 MIT. See [LICENSE](LICENSE).
-
-## Support
-
-Open an issue: [github.com/neurabytelabs/rustbridge/issues](https://github.com/neurabytelabs/rustbridge/issues)
-
-Built by Mustafa Saraç ([NeuraByte Labs](https://neurabytelabs.com)).
